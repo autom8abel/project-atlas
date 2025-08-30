@@ -1,0 +1,57 @@
+# Specify the version of the Docker Compose file format.
+version: '3.8'
+
+# Define the services (containers) that make up our application.
+services:
+
+  # Service name: 'db' (our PostgreSQL database)
+  db:
+    image: postgres:15-alpine # Uses a smaller Alpine Linux-based image
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/db/:/docker-entrypoint-initdb.d/ # Mounts our init scripts
+    expose:
+      - "5432" # Exposes port 5432 to other containers on the same network
+
+  # Service name: 'n8n' (our workflow automation server)
+  n8n:
+    image: n8nio/n8n
+    depends_on:
+      - db
+    ports:
+      - "5678:5678" # Maps host port 5678 to container port 5678
+    environment:
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=db
+      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
+      - DB_POSTGRESDB_USER=${POSTGRES_USER}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+      - N8N_HOST=localhost
+    volumes:
+      - n8n_data:/home/node/.n8n
+
+  # Service name: 'web' (our FastAPI application)
+  web:
+    build: . # Builds the image using the Dockerfile in the current directory
+    depends_on:
+      - db
+      - n8n
+    ports:
+      - "8000:8000" # Maps host port 8000 to container port 8000
+    volumes:
+      - .:/app # Mounts the current directory for development (enables live code reloading)
+    env_file:
+      - .env # Loads environment variables from this file
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      - N8N_URL=http://n8n:5678
+
+# Define the named volumes used by the services above.
+# Docker will create these volumes if they don't exist.
+volumes:
+  pgdata:
+  n8n_data:
