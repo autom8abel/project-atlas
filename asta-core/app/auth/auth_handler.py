@@ -3,8 +3,9 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import HTTPException, status, Depends
 from fastapi.security import OAuth2PasswordBearer
-from app.db.database import get_db_connection
-import asyncpg
+from app.db.session import get_db
+from app.schemas.user import TokenData
+from sqlalchemy.ext.asyncio import AsyncSession
 import os
 from dotenv import load_dotenv
 
@@ -18,7 +19,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
 # Password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# This tells FastAPI that the tokenUrl is the endpoint for login (which I will create next)
+# This tells FastAPI that the tokenUrl is the endpoint for login
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 def verify_password(plain_password, hashed_password):
@@ -26,13 +27,12 @@ def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
 def get_password_hash(password):
-    """Hashes a plain text password. (We already have this in routes/user.py, we can refactor later)"""
+    """Hashes a plain text password."""
     return pwd_context.hash(password)
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
     """
     Creates a new JWT access token.
-    The 'data' dict should contain the claims (e.g., user identifier).
     """
     to_encode = data.copy()
     if expires_delta:
@@ -43,17 +43,9 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-async def get_current_user(token: str = Depends(oauth2_scheme), conn=Depends(get_db_connection)):
+async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)):
     """
     FastAPI Dependency that will be used to protect routes.
-    It:
-    1. Extracts the JWT from the Authorization header.
-    2. Verifies the JWT is valid and not expired.
-    3. Extracts the user identity from the JWT.
-    4. Fetches the user from the database.
-    5. Returns the user object.
-
-    If any step fails, it raises an HTTPException.
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -61,18 +53,20 @@ async def get_current_user(token: str = Depends(oauth2_scheme), conn=Depends(get
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        # Decode and verify the JWT
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id: str = payload.get("sub")
         if user_id is None:
             raise credentials_exception
+        token_data = TokenData(id=user_id)
     except JWTError:
         raise credentials_exception
 
-    # Fetch the user from the database
-    query = "SELECT id, email, full_name, company_name, is_active, is_superuser, created_at FROM users WHERE id = $1"
-    user = await conn.fetchrow(query, int(user_id))
-
-    if user is None:
-        raise credentials_exception
-    return user
+    # We'll implement the user fetching logic after we create the user routes
+    # For now, we'll return the user_id
+    # from app.models.user import User
+    # user = await db.get(User, int(token_data.id))
+    # if user is None:
+    #     raise credentials_exception
+    # return user
+    
+    return {"id": token_data.id}  # Temporary implementation

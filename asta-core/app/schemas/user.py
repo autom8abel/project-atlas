@@ -18,6 +18,7 @@ class User(UserBase):
     is_active: bool
     is_superuser: bool
     created_at: datetime
+    updated_at: datetime
 
     # This tells Pydantic to work with ORM objects, not just dicts
     class Config:
