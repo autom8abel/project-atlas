@@ -33,3 +33,16 @@ class User(Base):
     # This is a helpful representation for debugging.
     def __repr__(self):
         return f"<User(id={self.id}, email={self.email})>"
+    
+    def to_schema(self):
+        """Convert ORM model to Pydantic schema compatible dict."""
+        return {
+            "id": self.id,
+            "email": self.email,
+            "full_name": self.full_name,
+            "company_name": self.company_name,
+            "is_active": self.is_active,
+            "is_superuser": self.is_superuser,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at
+        }

@@ -6,6 +6,8 @@ from fastapi.security import OAuth2PasswordBearer
 from app.db.session import get_db
 from app.schemas.user import TokenData
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.models.user import User
+from sqlalchemy import select
 import os
 from dotenv import load_dotenv
 
@@ -45,7 +47,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
 
 async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)):
     """
-    FastAPI Dependency that will be used to protect routes.
+    FastAPI Dependency that will be used to protect routes. Now fully implemented to return a User object.
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -61,12 +63,11 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
     except JWTError:
         raise credentials_exception
 
-    # We'll implement the user fetching logic after we create the user routes
-    # For now, we'll return the user_id
-    # from app.models.user import User
-    # user = await db.get(User, int(token_data.id))
-    # if user is None:
-    #     raise credentials_exception
-    # return user
+    query = select(User).where(User.id == int(token_data.id))
+    result = await db.execute(query)
+    user = result.scalar_one_or_none()
     
-    return {"id": token_data.id}  # Temporary implementation
+    if user is None:
+        raise credentials_exception
+        
+    return user

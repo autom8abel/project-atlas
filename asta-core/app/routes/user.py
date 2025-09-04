@@ -1,11 +1,12 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from typing import List
 
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.user import UserCreate, User as UserSchema
-from app.auth.auth_handler import get_password_hash
+from app.auth.auth_handler import get_password_hash, get_current_user
 
 router = APIRouter()
 
@@ -47,3 +48,42 @@ async def create_user(user_data: UserCreate, db: AsyncSession = Depends(get_db))
 
     # 5. Return the created user (matches UserSchema which excludes password)
     return new_user
+
+@router.get("/", response_model=List[UserSchema])
+async def get_all_users(
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)  # Basic protection
+):
+    """
+    Get a list of all users.
+    Requires authentication.
+    """
+    # TODO: Add proper authorization (e.g., only superusers can see all users)
+    # For now, we just require any valid authentication
+    query = select(User)
+    result = await db.execute(query)
+    users = result.scalars().all()
+    
+    return [user.to_schema() for user in users]
+
+@router.get("/{user_id}", response_model=UserSchema)
+async def get_user(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)  # Basic protection
+):
+    """
+    Get a specific user by ID.
+    Requires authentication.
+    """
+    query = select(User).where(User.id == user_id)
+    result = await db.execute(query)
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User with ID {user_id} not found."
+        )
+    
+    return user.to_schema()
