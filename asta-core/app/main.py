@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from app.db.session import engine
-from app.routes import auth
+from app.routes import auth, user
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -21,6 +21,7 @@ app = FastAPI(
 
 # Include the routers
 app.include_router(auth.router)
+app.include_router(user.router, prefix="/users", tags=["users"])
 
 # A simple root endpoint to test if the API is running
 @app.get("/")
