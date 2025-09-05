@@ -1,7 +1,10 @@
 from sqlalchemy import String, Boolean, DateTime, func
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base  # Import the Base class we just created
+from typing import TYPE_CHECKING, List
 
+if TYPE_CHECKING:
+    from app.models.task import Task
 class User(Base):
     """
     ORM model for the 'users' database table.
@@ -29,6 +32,8 @@ class User(Base):
     # Timestamps. We use `server_default` to let PostgreSQL set the value on insert.
     created_at: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    tasks: Mapped[List["Task"]] = relationship("Task", back_populates="user", cascade="all, delete-orphan")
 
     # This is a helpful representation for debugging.
     def __repr__(self):
